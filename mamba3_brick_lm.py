@@ -26,8 +26,21 @@ class Mamba3QuinaryBrickLM:
         self.opt = torch.optim.Adam(params, lr=3e-3)
 
     def _forward(self, ids: torch.Tensor) -> torch.Tensor:
+        """TRAINING forward -- requantizes fresh from the float32 masters every call, correct
+        and necessary while those masters are still changing under the optimizer."""
         x = self.emb(ids)
         h = self.brick.quantized_forward_with_grad(x)
+        return self.head(h)
+
+    def forward_inference(self, ids: torch.Tensor) -> torch.Tensor:
+        """INFERENCE forward, for use AFTER unpack_brick() -- the weights are already the exact
+        discrete quinary values (dequantized via their STORED scale, not a freshly-recomputed
+        one). Calling quantized_forward_with_grad here would re-derive a DIFFERENT scale from
+        these already-quantized values (mean(abs(level*scale)) != scale in general) and silently
+        corrupt them -- this bypasses that entirely and runs the real Mamba3 forward directly on
+        the exact values already set."""
+        x = self.emb(ids)
+        h = self.brick.mamba(x)
         return self.head(h)
 
     def learn_batch(self, idxs_batch, lr_scale=1.0):

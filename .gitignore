@@ -3,3 +3,4 @@ __pycache__/
 *.log
 *.npz
 _triton_smoke_test.py
+_archive_coding_500_run/

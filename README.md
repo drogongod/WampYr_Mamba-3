@@ -59,3 +59,43 @@ the two recurrence types at real scale.
 | `evidence_contract_test.py` | Single-brick evidence test (catastrophic forgetting demonstrated directly, motivating the clustered test). |
 | `evidence_contract_test_clustered.py` | Multi-fact test through real routing. |
 | `evidence_contract_test_original_gatedrnn.py` | Side-by-side comparison against the original gated-RNN bricks. |
+| `evidence_contract_test_programming_agent.py` | Real programming task through the donor-fallback mechanism, donor code verified by actual execution, not eyeballed. |
+| `train_coding_dataset.py` | Direct teaching from a real, pre-answered coding dataset (no donor round-trip needed). |
+| `mamba3_quinary_pack.py` | Pack-for-inference export: compact on-disk quinary storage (nibble-packed), dequantize-on-load. Verified lossless round trip. |
+| `active_state_folding_test*.py` | The session-memory/active-state folding experiments (see below). |
+
+## More real results
+
+**Programming-agent mechanism**: donor-fallback verified working for actual code, not just trivia
+-- a real `reverse_string` task, donor-generated code verified correct by **actually executing
+it** against 4 test cases, learned immediately. (Retention-under-interference at this task alone
+is inconclusive at n=2 facts -- same small-sample gate limit documented above, not yet tested at
+scale for code specifically within the donor-fallback path.)
+
+**Direct dataset training, real scale**: teaching directly from a real, pre-verified coding
+dataset's own (instruction, output) pairs (no donor needed) --
+- 500 examples: **456/500 = 91.2%** retained host-off, 428 bricks.
+- 2000 examples: **1832/2000 = 91.6%**, holding steady at 4x scale -- and a real phase-transition
+  consolidation event at fact 1000 (429 bricks merged in one pass, 779->350), after which the
+  brick population actually *shrank* despite 4x more data taught, ending at a smaller footprint
+  (271 bricks) than the 500-example run (428).
+
+**Active-state / session-memory folding (the gap distinct from long-term factual retention)**:
+tested via a real associative-recall benchmark (same shape as the actual S4/H3/Mamba academic
+benchmark for this property) -- a fact stated once, then enough filler to exceed the old
+rolling-text-window's `MAX_SESSION_TURNS=6`, then asked for. The old mechanism cannot answer this
+by construction (the fact is deleted from its input); whether the real Mamba3 recurrence does is
+an empirical question about training, not architecture.
+- Sparse single mention + unrelated filler: 6.7% held-out, mode-collapsed to one fixed wrong
+  answer. Diagnosed via a metric split: filler-bytes loss converged, color-bytes loss never did
+  -- the aggregate loss was hiding total failure on the one thing that mattered.
+- Reinforced density (target repeated 5-8x across varied sentences): 93.3% held-out, but a
+  specific repeatable confusion (orange/green) and failure to generalize to genuinely novel
+  phrasing outside the trained template family.
+- Direct co-occurrence (the two words that actually matter -- "favorite" and the color --
+  repeated together, not just the color alone): **100% held-out**, the orange/green confusion
+  resolved, and generalization to genuinely novel out-of-template phrasing achieved.
+**Conclusion**: this was never a fundamental limit of the Mamba3 recurrence -- it was a
+training-data-design problem the whole time. The mechanism genuinely folds information past the
+old window's limit once the training data actually teaches the specific association, not just
+exposes the model to the raw fact.
