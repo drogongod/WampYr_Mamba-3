@@ -103,6 +103,21 @@ for step in range(N_TRAIN_STEPS):
         print(f"  step {step}: weighted_loss={loss.item():.4f}  color_bytes_loss={color_loss:.4f}",
               flush=True)
 
+# Preserve this trained model -- 2026-10-15, explicit instruction: "keep a copy of the
+# training that has worked so well" before building the Forward-Forward comparison.
+CHECKPOINT_PATH = os.path.join(os.path.dirname(__file__), "data", "checkpoints",
+                                "active_state_v3_cooccurrence_100pct.pt")
+os.makedirs(os.path.dirname(CHECKPOINT_PATH), exist_ok=True)
+torch.save({
+    "emb": model.emb.state_dict(),
+    "mamba": model.brick.mamba.state_dict(),
+    "head": model.head.state_dict(),
+    "d_model": D_MODEL,
+    "note": "v3 direct favorite+color co-occurrence training, 100% held-out, "
+            "generalized to Jonathan's own out-of-template example. 2026-10-15.",
+}, CHECKPOINT_PATH)
+print(f"\n[checkpoint saved] {CHECKPOINT_PATH}", flush=True)
+
 print("\n=== JONATHAN'S EXACT EXAMPLE (red, vampire/blood imagery, NOT in this template family) ===",
       flush=True)
 gen = model.generate(JONATHANS_EXAMPLE, n=6)
