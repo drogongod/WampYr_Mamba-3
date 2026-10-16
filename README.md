@@ -99,3 +99,37 @@ an empirical question about training, not architecture.
 training-data-design problem the whole time. The mechanism genuinely folds information past the
 old window's limit once the training data actually teaches the specific association, not just
 exposes the model to the raw fact.
+
+## Local-learning tech tree: does restricted-gradient training work on this substrate?
+
+Five different non-standard training mechanisms tried on the same recall task, same evaluation,
+to see whether anything other than full backpropagation can actually train this substrate:
+
+- **Forward-Forward** (Hinton's contrastive goodness objective): 73.3% peak -- but uses
+  ordinary, unrestricted backprop through the whole brick; only the loss function changed, not
+  how gradients reach the weights.
+- **Sister-split** (the project's own real evolutionary relay mechanism, `sovereign_core.py`,
+  faithfully ported): 93.3% with and without the relay-split active -- a real, honest null
+  result for the split mechanism specifically, at this scale.
+- **PC-ALM** (Sakana AI's Augmented Lagrangian Predictive Coding): 0%, after finding and fixing
+  8 confirmed, diagnostically-verified bugs in sequence (NaN instability, Triton
+  autotune-thrashing, non-stationary gradient scale, loss dilution, a train/test settling
+  mismatch, a frozen embedding layer). A real negative result on this substrate at this
+  settling-iteration budget, not an implementation artifact.
+- **True 6-brick chain** (3 frozen-random bricks feeding 3 trainable ones): 0%, same
+  frozen-embedding bug found and fixed, no change to the result.
+- **TBPTT / rolling-window**: the one real positive result for genuinely restricted gradient
+  flow. A window sweep (3/16/64/256/full-sequence, 1200 training examples) first looked like a
+  sharp cliff between 64 and 256 bytes -- then a real boundary-alignment confound was caught:
+  chunk boundaries were anchored to the start of the sequence, so small windows' last
+  (answer-adjacent) chunk often landed entirely after the actual evidence by pure accident of
+  sequence length. Re-tested with boundaries anchored to the *end* of the sequence instead
+  (guaranteeing the last window is always exactly the stated size immediately before the
+  query): window=64 recovered to 40-77% across two seeds (vs. 10% originally), window=256
+  confirmed strong at 93.3%/96.7% once a single-seed instability outlier was accounted for.
+
+**Conclusion**: genuinely restricted-gradient local learning is not incompatible with this
+Mamba-3 substrate -- TBPTT proves it works once the credit horizon is sized (and *measured*,
+not assumed) correctly. Forward-Forward and sister-split's good scores don't actually test this
+claim at all, since both still use ordinary backprop under the hood. PC-ALM and the frozen-chain
+test remain open questions, with concrete next experiments identified but not yet run.
